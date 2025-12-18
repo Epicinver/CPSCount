@@ -1,7 +1,15 @@
 #include <chrono>
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
-#include <Geode/modify/PlayerObject.hpp>
+
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
+#ifdef __APPLE__
+#include <ApplicationServices/ApplicationServices.h>
+#include <Carbon/Carbon.h>
+#endif
 
 using namespace geode::prelude;
 
@@ -9,26 +17,82 @@ static CCLabelBMFont *cpsLabel = nullptr;
 static int clicks = 0;
 static auto lastTime = std::chrono::steady_clock::now();
 
-enum class CPSPosition
-{
-    BottomRight,
-    TopRight,
-    BottomLeft
-};
+#ifdef _WIN32
+static bool lastLMB = false;
+static bool lastSpace = false;
+static bool lastUp = false;
 
-static CPSPosition cpsPos = CPSPosition::BottomRight;
-
-void registerClick()
+static bool downNow(int vk)
 {
-    clicks++;
+    return (GetAsyncKeyState(vk) & 0x8000) != 0;
 }
 
-void updateCPS()
+static void pollWindowsInput()
 {
+    bool lmb = downNow(VK_LBUTTON);
+    if (lmb && !lastLMB)
+        clicks++;
+    lastLMB = lmb;
+
+    bool sp = downNow(VK_SPACE);
+    if (sp && !lastSpace)
+        clicks++;
+    lastSpace = sp;
+
+    bool up = downNow(VK_UP);
+    if (up && !lastUp)
+        clicks++;
+    lastUp = up;
+}
+#endif
+
+#ifdef __APPLE__
+static bool lastLMB = false;
+static bool lastSpace = false;
+static bool lastUp = false;
+
+static bool keyDownMac(CGKeyCode key)
+{
+    return CGEventSourceKeyState(
+        kCGEventSourceStateCombinedSessionState,
+        key);
+}
+
+static bool mouseDownMac(CGMouseButton btn)
+{
+    return CGEventSourceButtonState(
+        kCGEventSourceStateCombinedSessionState,
+        btn);
+}
+
+static void pollMacInput()
+{
+    bool lmb = mouseDownMac(kCGMouseButtonLeft);
+    if (lmb && !lastLMB)
+        clicks++;
+    lastLMB = lmb;
+
+    bool space = keyDownMac(kVK_Space);
+    if (space && !lastSpace)
+        clicks++;
+    lastSpace = space;
+
+    bool up = keyDownMac(kVK_UpArrow);
+    if (up && !lastUp)
+        clicks++;
+    lastUp = up;
+}
+#endif
+
+static void updateCPS()
+{
+    if (!cpsLabel)
+        return;
+
     auto now = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed = now - lastTime;
 
-    if (elapsed.count() >= 1.0 && cpsLabel)
+    if (elapsed.count() >= 0.1)
     {
         double cps = clicks / elapsed.count();
         cpsLabel->setString(fmt::format("CPS: {:.1f}", cps).c_str());
@@ -37,67 +101,84 @@ void updateCPS()
     }
 }
 
-void positionLabel()
+class CPSInputLayer : public CCLayer
 {
-    if (!cpsLabel)
-        return;
-
-    auto winSize = CCDirector::sharedDirector()->getWinSize();
-
-    switch (cpsPos)
+public:
+    static CPSInputLayer *create()
     {
-    case CPSPosition::BottomRight:
-        cpsLabel->setAnchorPoint({1.f, 0.f});
-        cpsLabel->setPosition({winSize.width - 10.f, 10.f});
-        break;
-
-    case CPSPosition::TopRight:
-        cpsLabel->setAnchorPoint({1.f, 1.f});
-        cpsLabel->setPosition({winSize.width - 10.f, winSize.height - 10.f});
-        break;
-
-    case CPSPosition::BottomLeft:
-        cpsLabel->setAnchorPoint({0.f, 0.f});
-        cpsLabel->setPosition({10.f, 10.f});
-        break;
+        auto ret = new CPSInputLayer();
+        if (ret && ret->init())
+        {
+            ret->autorelease();
+            return ret;
+        }
+        CC_SAFE_DELETE(ret);
+        return nullptr;
     }
-}
 
-void addCPSLabel(CCNode *parent)
-{
-    cpsLabel = CCLabelBMFont::create("CPS: 0", "chatFont.fnt");
-    cpsLabel->setScale(0.4f);
-    cpsLabel->setZOrder(1000);
+    bool init() override
+    {
+        if (!CCLayer::init())
+            return false;
 
-    positionLabel();
-    parent->addChild(cpsLabel);
-}
+#ifndef _WIN32
+        this->setTouchEnabled(true);
+        this->setTouchMode(kCCTouchesOneByOne);
+        CCDirector::sharedDirector()
+            ->getTouchDispatcher()
+            ->addTargetedDelegate(this, -128, false);
+#endif
 
-class $modify(CPSInit, PlayLayer)
+        this->schedule(schedule_selector(CPSInputLayer::tick));
+        return true;
+    }
+
+    void tick(float)
+    {
+#ifdef _WIN32
+        pollWindowsInput();
+#elif defined(__APPLE__)
+        pollMacInput();
+#endif
+        updateCPS();
+    }
+
+#ifndef _WIN32
+    bool ccTouchBegan(CCTouch *, CCEvent *) override
+    {
+        clicks++;
+        return false;
+    }
+#endif
+};
+
+class $modify(CPSPlayLayer, PlayLayer)
 {
     bool init(GJGameLevel *level, bool p1, bool p2)
     {
         if (!PlayLayer::init(level, p1, p2))
             return false;
 
+        auto winSize = CCDirector::sharedDirector()->getWinSize();
+
+        cpsLabel = CCLabelBMFont::create("CPS: 0", "chatFont.fnt");
+        cpsLabel->setAnchorPoint({1.f, 0.f});
+        cpsLabel->setPosition({winSize.width - 10.f, 10.f});
+        cpsLabel->setScale(0.4f);
+        cpsLabel->setZOrder(1000);
+        this->addChild(cpsLabel);
+
         clicks = 0;
         lastTime = std::chrono::steady_clock::now();
-        addCPSLabel(this);
+
+#ifdef _WIN32
+        lastLMB = lastSpace = lastUp = false;
+#endif
+#ifdef __APPLE__
+        lastLMB = lastSpace = lastUp = false;
+#endif
+
+        this->addChild(CPSInputLayer::create(), 999);
         return true;
-    }
-
-    void update(float dt)
-    {
-        PlayLayer::update(dt);
-        updateCPS();
-    }
-};
-
-class $modify(CPSInput, PlayerObject)
-{
-    void pushButton(PlayerButton btn)
-    {
-        PlayerObject::pushButton(btn);
-        registerClick();
     }
 };

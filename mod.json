@@ -1,27 +1,14 @@
 {
-	"geode": "4.10.0",
-	"gd": {
-		"win": "2.2074",
-		"android": "2.2074",
-		"mac": "2.2074",
-		"ios": "2.2074"
-	},
-	"id": "epicinver.cps-count-label",
-	"name": "CPS Count Label",
-	"version": "v1.0.0",
-	"developer": "Epicinver",
-	"description": "haha clicks per second game label lolololol",
-	"settings": {
-		"cps-position": {
-			"type": "enum",
-			"name": "CPS Position",
-			"description": "Where the CPS label is shown",
-			"default": 0,
-			"options": [
-				"Bottom Right",
-				"Top Right",
-				"Bottom Left"
-			]
-		}
-	}
+  "geode": "4.10.0",
+  "gd": {
+    "win": "2.2074",
+    "android": "2.2074",
+    "mac": "2.2074",
+    "ios": "2.2074"
+  },
+  "id": "epicinver.cps-count-label",
+  "name": "CPS Count Label",
+  "version": "v1.5.0",
+  "developer": "Epicinver",
+  "description": "Clicks per second label"
 }
