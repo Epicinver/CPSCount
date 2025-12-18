@@ -6,3 +6,7 @@
 # 1.5.0
 
 - CPS works
+
+# 1.5.1
+
+- Changed logo aspect ratio
