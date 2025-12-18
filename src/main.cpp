@@ -1,13 +1,22 @@
 #include <chrono>
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
-#include <Geode/modify/GJBaseGameLayer.hpp>
+#include <Geode/modify/PlayerObject.hpp>
 
 using namespace geode::prelude;
 
 static CCLabelBMFont *cpsLabel = nullptr;
 static int clicks = 0;
 static auto lastTime = std::chrono::steady_clock::now();
+
+enum class CPSPosition
+{
+    BottomRight,
+    TopRight,
+    BottomLeft
+};
+
+static CPSPosition cpsPos = CPSPosition::BottomRight;
 
 void registerClick()
 {
@@ -28,40 +37,41 @@ void updateCPS()
     }
 }
 
-void addBottomRightLabel(CCNode *parent)
+void positionLabel()
 {
+    if (!cpsLabel)
+        return;
+
     auto winSize = CCDirector::sharedDirector()->getWinSize();
 
+    switch (cpsPos)
+    {
+    case CPSPosition::BottomRight:
+        cpsLabel->setAnchorPoint({1.f, 0.f});
+        cpsLabel->setPosition({winSize.width - 10.f, 10.f});
+        break;
+
+    case CPSPosition::TopRight:
+        cpsLabel->setAnchorPoint({1.f, 1.f});
+        cpsLabel->setPosition({winSize.width - 10.f, winSize.height - 10.f});
+        break;
+
+    case CPSPosition::BottomLeft:
+        cpsLabel->setAnchorPoint({0.f, 0.f});
+        cpsLabel->setPosition({10.f, 10.f});
+        break;
+    }
+}
+
+void addCPSLabel(CCNode *parent)
+{
     cpsLabel = CCLabelBMFont::create("CPS: 0", "chatFont.fnt");
-    cpsLabel->setAnchorPoint({1.f, 0.f});
-    cpsLabel->setPosition({winSize.width - 10.f, 10.f});
     cpsLabel->setScale(0.4f);
     cpsLabel->setZOrder(1000);
 
+    positionLabel();
     parent->addChild(cpsLabel);
 }
-
-class $modify(CPSPlayLayer, PlayLayer)
-{
-    void update(float dt)
-    {
-        PlayLayer::update(dt);
-        updateCPS();
-    }
-};
-
-class $modify(CPSInput, GJBaseGameLayer)
-{
-    void handleButton(bool down, int button, bool isPlayer1)
-    {
-        GJBaseGameLayer::handleButton(down, button, isPlayer1);
-
-        if (down)
-        {
-            registerClick();
-        }
-    }
-};
 
 class $modify(CPSInit, PlayLayer)
 {
@@ -70,7 +80,24 @@ class $modify(CPSInit, PlayLayer)
         if (!PlayLayer::init(level, p1, p2))
             return false;
 
-        addBottomRightLabel(this);
+        clicks = 0;
+        lastTime = std::chrono::steady_clock::now();
+        addCPSLabel(this);
         return true;
+    }
+
+    void update(float dt)
+    {
+        PlayLayer::update(dt);
+        updateCPS();
+    }
+};
+
+class $modify(CPSInput, PlayerObject)
+{
+    void pushButton(PlayerButton btn)
+    {
+        PlayerObject::pushButton(btn);
+        registerClick();
     }
 };

@@ -10,5 +10,18 @@
 	"name": "CPS Count Label",
 	"version": "v1.0.0",
 	"developer": "Epicinver",
-	"description": "haha clicks per second game label lolololol"
+	"description": "haha clicks per second game label lolololol",
+	"settings": {
+		"cps-position": {
+			"type": "enum",
+			"name": "CPS Position",
+			"description": "Where the CPS label is shown",
+			"default": 0,
+			"options": [
+				"Bottom Right",
+				"Top Right",
+				"Bottom Left"
+			]
+		}
+	}
 }
