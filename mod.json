@@ -8,7 +8,7 @@
   },
   "id": "epicinver.cps-count-label",
   "name": "CPS Count Label",
-  "version": "v1.5.0",
+  "version": "v1.5.1",
   "developer": "Epicinver",
   "description": "Clicks per second label"
 }
